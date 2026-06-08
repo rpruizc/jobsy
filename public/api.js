@@ -16,7 +16,7 @@ const api = {
   del(path) { return this.req("DELETE", path); },
 
   me() { return this.get("/api/auth/me"); },
-  register(email, password) { return this.post("/api/auth/register", { email, password }); },
+  register(email, password, invite) { return this.post("/api/auth/register", { email, password, invite }); },
   login(email, password) { return this.post("/api/auth/login", { email, password }); },
   logout() { return this.post("/api/auth/logout"); },
 

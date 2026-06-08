@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "../db.js";
 import { createSession, currentUser, destroySession, hashPassword, verifyPassword } from "../auth.js";
-import { isEmailAllowed } from "../config.js";
+import { claimInvite, findUnusedInvite, hashCode } from "../invites.js";
 import type { PublicUser } from "../../types.js";
 
 export const authRouter = Router();
@@ -32,24 +32,50 @@ function validCredentials(email: unknown, password: unknown): email is string {
   );
 }
 
+// Register requires a single-use invite code. The code is only consumed if the
+// account is actually created — the whole thing runs in one transaction, so a
+// failed signup (e.g. duplicate email) doesn't burn the invite.
+const registerTxn = db.transaction((email: string, passwordHash: string, codeHash: string): number => {
+  if (!findUnusedInvite.get(codeHash)) {
+    throw Object.assign(new Error("invite"), { kind: "invite" });
+  }
+  const info = insertUser.run(email, passwordHash); // throws on duplicate email (UNIQUE)
+  const userId = Number(info.lastInsertRowid);
+  const claimed = claimInvite.run(userId, codeHash);
+  if (claimed.changes !== 1) throw Object.assign(new Error("invite"), { kind: "invite" });
+  return userId;
+});
+
 authRouter.post("/register", (req, res) => {
-  const { email, password } = req.body ?? {};
+  const { email, password, invite } = req.body ?? {};
   if (!validCredentials(email, password)) {
     res.status(400).json({ error: "Enter a valid email and a password of at least 8 characters." });
     return;
   }
-  const normEmail = email.toLowerCase();
-  if (!isEmailAllowed(normEmail)) {
-    res.status(403).json({ error: "This app is invite-only. Ask the admin to add your email to the allowlist." });
+  if (typeof invite !== "string" || invite.trim() === "") {
+    res.status(400).json({ error: "An invite code is required to sign up." });
     return;
   }
+  const normEmail = email.toLowerCase();
   if (findByEmail.get(normEmail)) {
     res.status(409).json({ error: "That email is already registered." });
     return;
   }
-  const info = insertUser.run(normEmail, hashPassword(password));
-  createSession(res, Number(info.lastInsertRowid));
-  res.json({ user: { id: Number(info.lastInsertRowid), email: normEmail } satisfies PublicUser });
+  try {
+    const userId = registerTxn(normEmail, hashPassword(password), hashCode(invite.trim()));
+    createSession(res, userId);
+    res.json({ user: { id: userId, email: normEmail } satisfies PublicUser });
+  } catch (err) {
+    if (err && typeof err === "object" && "kind" in err && err.kind === "invite") {
+      res.status(403).json({ error: "Invalid or already-used invite code." });
+      return;
+    }
+    if (err instanceof Error && /UNIQUE/.test(err.message)) {
+      res.status(409).json({ error: "That email is already registered." });
+      return;
+    }
+    res.status(500).json({ error: "Could not create account." });
+  }
 });
 
 authRouter.post("/login", (req, res) => {

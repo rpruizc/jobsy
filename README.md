@@ -17,7 +17,7 @@ recruiter reposts dated as new.
 
 - **Accounts** — email + password, secure HTTP-only cookie sessions (scrypt
   hashing, no third-party auth service to configure). Registration is
-  **invite-only** via an email allowlist (see below).
+  **invite-only**: signing up requires a single-use invite code (see below).
 - **Filtered search** — keyword, location, remote/hybrid/on-site, salary floor,
   employment type, and a freshness window (last 24h / 48h / 7d / 30d). Results
   are sorted newest-first with accurate "3h ago" badges.
@@ -55,21 +55,33 @@ npm run typecheck  # tsc --noEmit
 
 No API key required — bluedoor's search endpoints are public.
 
-### Registration allowlist (invite-only)
+### Invite-only registration
 
-Only emails in the `ALLOWED_EMAILS` env var (comma-separated, case-insensitive)
-may create an account. It **fails closed**: if unset, nobody can register. Login
-for existing accounts is unaffected.
+Signing up requires a **single-use invite code** — a 144-bit random key, stored
+hashed, consumed the moment it's used. An email alone is worthless without a
+code, so guessing or discovering someone's address gets you nowhere.
+
+You mint codes with an **admin token** (the master key). It **fails closed**:
+with no `ADMIN_TOKEN` set, no codes can exist and nobody can register.
 
 ```bash
-# Local dev: allow yourself
-ALLOWED_EMAILS="me@example.com" npm run dev
+# 1. Set the admin token as a secret (generate a strong one)
+fly secrets set ADMIN_TOKEN="$(openssl rand -base64 24)" -a jobsy
+#    ...note the value you set; you need it to mint codes.
 
-# Fly: set it as a secret (keeps emails out of the repo), then redeploy
-fly secrets set ALLOWED_EMAILS="you@example.com,son@example.com"
+# 2. Mint an invite code
+curl -X POST https://jobsy.fly.dev/api/admin/invites \
+  -H "x-admin-token: <YOUR_ADMIN_TOKEN>" \
+  -H "content-type: application/json" \
+  -d '{"note":"for my son"}'
+# -> {"code":"<invite-code>","note":"for my son"}
+
+# 3. Give the code to whoever's signing up. They enter it on the Create
+#    account form. Each code works exactly once.
 ```
 
-Set this **before** the first person registers, or they'll get a 403.
+Local dev: `ADMIN_TOKEN=dev-token-123456 npm run dev`, then mint against
+`http://localhost:8080`.
 
 ---
 

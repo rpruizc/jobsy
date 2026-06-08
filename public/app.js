@@ -200,6 +200,8 @@ function setMode(m) {
   $("tabRegister").classList.toggle("active", m === "register");
   $("authSubmit").textContent = m === "login" ? "Sign in" : "Create account";
   $("password").autocomplete = m === "login" ? "current-password" : "new-password";
+  // Invite code is only needed to create an account.
+  $("invite").classList.toggle("hidden", m !== "register");
   $("authError").textContent = "";
 }
 
@@ -210,7 +212,10 @@ $("authForm").addEventListener("submit", async (e) => {
   const email = $("email").value.trim();
   const password = $("password").value;
   try {
-    const { user } = mode === "login" ? await api.login(email, password) : await api.register(email, password);
+    const { user } =
+      mode === "login"
+        ? await api.login(email, password)
+        : await api.register(email, password, $("invite").value.trim());
     showApp(user);
   } catch (err) {
     $("authError").textContent = err.message;

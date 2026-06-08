@@ -38,6 +38,17 @@ db.exec(`
     created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
   );
 
+  -- Single-use invite codes. We store only the SHA-256 of the code (like a
+  -- password), so a DB leak never exposes a usable invite.
+  CREATE TABLE IF NOT EXISTS invites (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    code_hash  TEXT NOT NULL UNIQUE,
+    note       TEXT,
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+    used_by    INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    used_at    TEXT
+  );
+
   CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
   CREATE INDEX IF NOT EXISTS idx_saved_user ON saved_searches(user_id);
 `);

@@ -1,24 +1,25 @@
-// Registration allowlist. Only emails listed in ALLOWED_EMAILS (comma-separated,
-// case-insensitive) may create an account. Fail closed: if the variable is unset
-// or empty, registration is disabled entirely.
+import { timingSafeEqual } from "node:crypto";
+
+// The admin token is the master key for minting invite codes. Set it as a Fly
+// secret so it stays out of the repo:
+//   fly secrets set ADMIN_TOKEN="$(openssl rand -base64 24)"
 //
-// Set it as a Fly secret so the emails stay out of the repo:
-//   fly secrets set ALLOWED_EMAILS="you@example.com,son@example.com"
-const allowedEmails = new Set(
-  (process.env.ALLOWED_EMAILS ?? "")
-    .split(",")
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean),
-);
+// Registration is invite-only and fails closed: with no admin token, no invites
+// can be minted, so nobody can sign up.
+const ADMIN_TOKEN = process.env.ADMIN_TOKEN ?? "";
 
-export const registrationOpen = allowedEmails.size > 0;
+export const adminEnabled = ADMIN_TOKEN.length >= 16;
 
-export function isEmailAllowed(email: string): boolean {
-  return allowedEmails.has(email.trim().toLowerCase());
+/** Constant-time check of an incoming admin token against the configured one. */
+export function verifyAdminToken(token: string | undefined): boolean {
+  if (!adminEnabled || !token) return false;
+  const a = Buffer.from(token);
+  const b = Buffer.from(ADMIN_TOKEN);
+  return a.length === b.length && timingSafeEqual(a, b);
 }
 
-export function allowlistSummary(): string {
-  return registrationOpen
-    ? `registration limited to ${allowedEmails.size} allowlisted email(s)`
-    : "registration CLOSED (set ALLOWED_EMAILS to permit sign-ups)";
+export function authSummary(): string {
+  return adminEnabled
+    ? "invite-only — mint codes via POST /api/admin/invites with the admin token"
+    : "invite-only and LOCKED — set ADMIN_TOKEN to mint invite codes";
 }
