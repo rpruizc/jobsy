@@ -16,6 +16,7 @@
     "better-sqlite3": "^11.7.0",
     "cookie-parser": "^1.4.7",
     "express": "^4.21.2",
+    "nodemailer": "^6.9.16",
     "tsx": "^4.19.2"
   },
   "devDependencies": {
@@ -24,6 +25,7 @@
     "@types/cookie-parser": "^1.4.8",
     "@types/express": "^4.17.21",
     "@types/node": "^22.10.2",
+    "@types/nodemailer": "^6.4.17",
     "typescript": "^5.7.2"
   }
 }

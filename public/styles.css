@@ -33,13 +33,9 @@ body {
 }
 .auth-card h1 { margin: 0; font-size: 26px; }
 .tagline { color: var(--muted); margin: 6px 0 22px; }
-.auth-tabs { display: flex; gap: 6px; margin-bottom: 16px; }
-.auth-tabs button {
-  flex: 1; background: var(--panel-2); border: 1px solid var(--line);
-  color: var(--muted); padding: 9px; border-radius: 9px; cursor: pointer; font-size: 14px;
-}
-.auth-tabs button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
-#authForm { display: flex; flex-direction: column; gap: 10px; }
+#requestForm, #codeForm { display: flex; flex-direction: column; gap: 10px; }
+.auth-card button { width: 100%; }
+#codeForm input { text-align: center; letter-spacing: 6px; font-size: 20px; }
 input, select {
   background: var(--panel-2); border: 1px solid var(--line); color: var(--text);
   padding: 11px 12px; border-radius: 9px; font-size: 14px; width: 100%;

@@ -5,7 +5,6 @@ import { dirname, join } from "node:path";
 import { authRouter } from "./routes/auth.js";
 import { searchRouter } from "./routes/search.js";
 import { savedRouter } from "./routes/saved.js";
-import { adminRouter } from "./routes/admin.js";
 import { authSummary } from "./config.js";
 
 const PUBLIC_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "public");
@@ -20,7 +19,6 @@ app.get("/healthz", (_req, res) => res.json({ ok: true }));
 app.use("/api/auth", authRouter);
 app.use("/api/search", searchRouter);
 app.use("/api/saved", savedRouter);
-app.use("/api/admin", adminRouter);
 
 // Static frontend. The SPA is a single page, so unknown non-API GETs fall back
 // to index.html.

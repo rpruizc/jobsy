@@ -1,5 +1,5 @@
 const $ = (id) => document.getElementById(id);
-let mode = "login"; // or "register"
+let pendingKey = null; // the login letter awaiting a code
 
 // ---------- helpers ----------
 function relTime(iso) {
@@ -186,41 +186,69 @@ async function saveCurrent() {
 function showApp(user) {
   $("auth").classList.add("hidden");
   $("app").classList.remove("hidden");
-  $("who").textContent = user.email;
+  $("who").textContent = `Signed in as ${user.key}`;
   loadSaved();
   runSearch();
 }
 function showAuth() {
   $("app").classList.add("hidden");
   $("auth").classList.remove("hidden");
+  showStep("request");
 }
-function setMode(m) {
-  mode = m;
-  $("tabLogin").classList.toggle("active", m === "login");
-  $("tabRegister").classList.toggle("active", m === "register");
-  $("authSubmit").textContent = m === "login" ? "Sign in" : "Create account";
-  $("password").autocomplete = m === "login" ? "current-password" : "new-password";
-  // Invite code is only needed to create an account.
-  $("invite").classList.toggle("hidden", m !== "register");
+function showStep(step) {
+  pendingKey = step === "request" ? null : pendingKey;
+  $("requestForm").classList.toggle("hidden", step !== "request");
+  $("codeForm").classList.toggle("hidden", step !== "code");
   $("authError").textContent = "";
+  if (step === "code") $("code").focus();
 }
 
-$("tabLogin").addEventListener("click", () => setMode("login"));
-$("tabRegister").addEventListener("click", () => setMode("register"));
-$("authForm").addEventListener("submit", async (e) => {
+async function loadOptions() {
+  const { options } = await api.options();
+  const sel = $("loginKey");
+  for (const k of options) {
+    const o = document.createElement("option");
+    o.value = k;
+    o.textContent = k;
+    sel.appendChild(o);
+  }
+}
+
+$("requestForm").addEventListener("submit", async (e) => {
   e.preventDefault();
-  const email = $("email").value.trim();
-  const password = $("password").value;
+  const key = $("loginKey").value;
+  if (!key) return;
+  $("sendBtn").disabled = true;
+  $("sendBtn").textContent = "Sending…";
   try {
-    const { user } =
-      mode === "login"
-        ? await api.login(email, password)
-        : await api.register(email, password, $("invite").value.trim());
+    await api.requestCode(key);
+    pendingKey = key;
+    $("codeHint").textContent = `Enter the 6-digit code we emailed to "${key}".`;
+    showStep("code");
+  } catch (err) {
+    $("authError").textContent = err.message;
+  } finally {
+    $("sendBtn").disabled = false;
+    $("sendBtn").textContent = "Email me a code";
+  }
+});
+
+$("codeForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  try {
+    const { user } = await api.verifyCode(pendingKey, $("code").value.trim());
+    $("code").value = "";
     showApp(user);
   } catch (err) {
     $("authError").textContent = err.message;
   }
 });
+
+$("backBtn").addEventListener("click", () => {
+  $("code").value = "";
+  showStep("request");
+});
+
 $("logout").addEventListener("click", async () => {
   await api.logout();
   showAuth();
@@ -235,6 +263,11 @@ $("namedOnly").addEventListener("change", runSearch);
 
 // ---------- boot ----------
 (async () => {
+  try {
+    await loadOptions();
+  } catch {
+    /* options load failure still shows the (empty) picker */
+  }
   try {
     const { user } = await api.me();
     if (user) showApp(user);

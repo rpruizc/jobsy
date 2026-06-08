@@ -42,7 +42,8 @@ export interface SearchResponse {
 
 export interface PublicUser {
   id: number;
-  email: string;
+  /** The login letter (R/D/H/P/G) — the user's whole identity. */
+  key: string;
 }
 
 export interface SavedSearch {

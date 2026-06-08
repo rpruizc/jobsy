@@ -12,17 +12,24 @@
       <div class="auth-card">
         <h1>🛰️ Jobsy</h1>
         <p class="tagline">Job search that gets you there first.</p>
-        <div class="auth-tabs">
-          <button id="tabLogin" class="active">Sign in</button>
-          <button id="tabRegister">Create account</button>
-        </div>
-        <form id="authForm">
-          <input id="email" type="email" placeholder="you@email.com" autocomplete="email" required />
-          <input id="password" type="password" placeholder="Password (8+ characters)" autocomplete="current-password" required />
-          <input id="invite" type="text" placeholder="Invite code" autocomplete="off" class="hidden" />
-          <button type="submit" id="authSubmit">Sign in</button>
-          <p id="authError" class="error"></p>
+
+        <!-- Step 1: pick who you are, email yourself a code -->
+        <form id="requestForm">
+          <select id="loginKey" required>
+            <option value="" disabled selected>Who are you?</option>
+          </select>
+          <button type="submit" id="sendBtn" class="primary">Email me a code</button>
         </form>
+
+        <!-- Step 2: enter the 6-digit code -->
+        <form id="codeForm" class="hidden">
+          <p class="muted small" id="codeHint">Enter the 6-digit code we just emailed.</p>
+          <input id="code" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="123456" autocomplete="one-time-code" />
+          <button type="submit" class="primary">Verify &amp; sign in</button>
+          <button type="button" id="backBtn" class="ghost">Use a different option</button>
+        </form>
+
+        <p id="authError" class="error"></p>
       </div>
     </div>
 

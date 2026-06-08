@@ -15,9 +15,10 @@ recruiter reposts dated as new.
 
 ## What it does
 
-- **Accounts** — email + password, secure HTTP-only cookie sessions (scrypt
-  hashing, no third-party auth service to configure). Registration is
-  **invite-only**: signing up requires a single-use invite code (see below).
+- **Passwordless sign-in** — no signup, no passwords. You pick your initial from
+  a fixed roster (R/D/H/P/G), and a one-time 6-digit code is emailed to you.
+  Enter it and you're in (secure HTTP-only cookie session). The emails behind the
+  letters live only in a server secret — never in the browser or the repo.
 - **Filtered search** — keyword, location, remote/hybrid/on-site, salary floor,
   employment type, and a freshness window (last 24h / 48h / 7d / 30d). Results
   are sorted newest-first with accurate "3h ago" badges.
@@ -55,33 +56,39 @@ npm run typecheck  # tsc --noEmit
 
 No API key required — bluedoor's search endpoints are public.
 
-### Invite-only registration
+### Sign-in setup (two secrets)
 
-Signing up requires a **single-use invite code** — a 144-bit random key, stored
-hashed, consumed the moment it's used. An email alone is worthless without a
-code, so guessing or discovering someone's address gets you nowhere.
+Sign-in is a passwordless email code for a fixed roster. Two pieces of config,
+both **secrets** so nothing sensitive is in the repo:
 
-You mint codes with an **admin token** (the master key). It **fails closed**:
-with no `ADMIN_TOKEN` set, no codes can exist and nobody can register.
+**1. The roster** — maps each login letter to a recipient email. Letters are all
+the browser ever sees; emails stay server-side.
 
 ```bash
-# 1. Set the admin token as a secret (generate a strong one)
-fly secrets set ADMIN_TOKEN="$(openssl rand -base64 24)" -a jobsy
-#    ...note the value you set; you need it to mint codes.
-
-# 2. Mint an invite code
-curl -X POST https://jobsy.fly.dev/api/admin/invites \
-  -H "x-admin-token: <YOUR_ADMIN_TOKEN>" \
-  -H "content-type: application/json" \
-  -d '{"note":"for my son"}'
-# -> {"code":"<invite-code>","note":"for my son"}
-
-# 3. Give the code to whoever's signing up. They enter it on the Create
-#    account form. Each code works exactly once.
+fly secrets set LOGIN_RECIPIENTS="R:a@x.com,D:b@x.com,H:c@x.com,P:d@x.com,G:e@x.com" -a jobsy
 ```
 
-Local dev: `ADMIN_TOKEN=dev-token-123456 npm run dev`, then mint against
-`http://localhost:8080`.
+**2. SMTP** — how codes get sent. With Gmail, create an
+[App Password](https://myaccount.google.com/apppasswords) (needs 2-Step
+Verification on) and:
+
+```bash
+fly secrets set -a jobsy \
+  SMTP_HOST=smtp.gmail.com SMTP_PORT=465 \
+  SMTP_USER=you@gmail.com SMTP_PASS=your-app-password \
+  MAIL_FROM="Jobsy <you@gmail.com>"
+```
+
+It **fails closed**: with no `LOGIN_RECIPIENTS`, the picker is empty and nobody
+can sign in. Until SMTP is set, codes are logged to the server (`fly logs`)
+instead of emailed — handy for local dev, where:
+
+```bash
+LOGIN_RECIPIENTS="R:me@x.com" npm run dev   # code prints to the console
+```
+
+Each code is 6 digits, single-use, expires in 10 minutes, and locks after 5
+wrong tries.
 
 ---
 
@@ -113,13 +120,18 @@ src/
   types.ts                 shared shapes (Job, SearchParams, SavedSearch…)
   server/
     index.ts               Express app: API routes + static frontend
-    db.ts                  better-sqlite3 schema (users, sessions, saved_searches)
-    auth.ts                scrypt hashing, cookie sessions, requireUser middleware
+    db.ts                  better-sqlite3 schema (users, sessions, login_codes,
+                           saved_searches)
+    config.ts              login roster (LOGIN_RECIPIENTS) — letters public,
+                           emails secret
+    auth.ts                cookie sessions + get-or-create user by login letter
+    otp.ts                 6-digit code: issue, verify, single-use, lockout
+    mailer.ts              SMTP send (nodemailer); logs the code if SMTP unset
     bluedoor.ts            search client: filter mapping, employer derivation,
                            "named only" provider merge, freshness counting
     searchParams.ts        validates/sanitizes untrusted filter input
     routes/
-      auth.ts              register / login / logout / me
+      auth.ts              options / request-code / verify-code / logout / me
       search.ts            GET /api/search  (auth-gated proxy)
       saved.ts             saved-search CRUD + "new since last viewed"
 public/                    vanilla SPA (no build step): auth gate, filters,
@@ -127,9 +139,11 @@ public/                    vanilla SPA (no build step): auth gate, filters,
 Dockerfile, fly.toml       container + Fly config
 ```
 
-**Data model.** `users` (email + scrypt hash), `sessions` (sha256 of the cookie
-token, 30-day expiry), `saved_searches` (per-user filter JSON + `last_viewed_at`,
-the timestamp that powers the "new since" diff). Timestamps are stored as ISO-8601
+**Data model.** `users` (login letter only — no email, no password), `sessions`
+(sha256 of the cookie token, 30-day expiry), `login_codes` (hashed 6-digit code
+per key, with expiry + attempt count), `saved_searches` (per-user filter JSON +
+`last_viewed_at`, the timestamp that powers the "new since" diff). Timestamps are
+stored as ISO-8601
 UTC so they compare directly against the API's `first_seen_at`.
 
 **Why the search is gated behind auth:** this is a personal/account product, not

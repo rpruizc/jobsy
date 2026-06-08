@@ -16,8 +16,9 @@ const api = {
   del(path) { return this.req("DELETE", path); },
 
   me() { return this.get("/api/auth/me"); },
-  register(email, password, invite) { return this.post("/api/auth/register", { email, password, invite }); },
-  login(email, password) { return this.post("/api/auth/login", { email, password }); },
+  options() { return this.get("/api/auth/options"); },
+  requestCode(key) { return this.post("/api/auth/request-code", { key }); },
+  verifyCode(key, code) { return this.post("/api/auth/verify-code", { key, code }); },
   logout() { return this.post("/api/auth/logout"); },
 
   search(params) {

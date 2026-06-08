@@ -1,4 +1,4 @@
-import { randomBytes, scryptSync, timingSafeEqual, createHash } from "node:crypto";
+import { randomBytes, createHash } from "node:crypto";
 import type { Request, Response, NextFunction } from "express";
 import { db } from "./db.js";
 import type { PublicUser } from "../types.js";
@@ -6,20 +6,15 @@ import type { PublicUser } from "../types.js";
 const SESSION_TTL_DAYS = 30;
 const COOKIE = "jobsy_sid";
 
-// --- Password hashing (scrypt, no external dependency) ---
+// --- Users are keyed by login letter; create on first successful sign-in ---
 
-export function hashPassword(password: string): string {
-  const salt = randomBytes(16).toString("hex");
-  const hash = scryptSync(password, salt, 64).toString("hex");
-  return `${salt}:${hash}`;
-}
+const getUserByKey = db.prepare("SELECT id FROM users WHERE login_key = ?");
+const insertUser = db.prepare("INSERT INTO users (login_key) VALUES (?)");
 
-export function verifyPassword(password: string, stored: string): boolean {
-  const [salt, hash] = stored.split(":");
-  if (!salt || !hash) return false;
-  const expected = Buffer.from(hash, "hex");
-  const actual = scryptSync(password, salt, 64);
-  return expected.length === actual.length && timingSafeEqual(expected, actual);
+export function getOrCreateUser(loginKey: string): number {
+  const row = getUserByKey.get(loginKey) as { id: number } | undefined;
+  if (row) return row.id;
+  return Number(insertUser.run(loginKey).lastInsertRowid);
 }
 
 // --- Sessions: random token in the cookie, only its hash stored server-side ---
@@ -30,7 +25,7 @@ const insertSession = db.prepare(
   "INSERT INTO sessions (id, user_id, expires_at) VALUES (?, ?, datetime('now', ?))",
 );
 const findSession = db.prepare(
-  `SELECT u.id, u.email FROM sessions s
+  `SELECT u.id, u.login_key AS key FROM sessions s
    JOIN users u ON u.id = s.user_id
    WHERE s.id = ? AND s.expires_at > datetime('now')`,
 );
