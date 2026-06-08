@@ -5,6 +5,7 @@ import { dirname, join } from "node:path";
 import { authRouter } from "./routes/auth.js";
 import { searchRouter } from "./routes/search.js";
 import { savedRouter } from "./routes/saved.js";
+import { allowlistSummary } from "./config.js";
 
 const PUBLIC_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "public");
 const PORT = Number(process.env.PORT ?? 8080);
@@ -26,4 +27,5 @@ app.get(/^(?!\/api\/).*/, (_req, res) => res.sendFile(join(PUBLIC_DIR, "index.ht
 
 app.listen(PORT, () => {
   console.log(`Jobsy listening on http://localhost:${PORT}`);
+  console.log(`Auth: ${allowlistSummary()}`);
 });

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { db } from "../db.js";
 import { createSession, currentUser, destroySession, hashPassword, verifyPassword } from "../auth.js";
+import { isEmailAllowed } from "../config.js";
 import type { PublicUser } from "../../types.js";
 
 export const authRouter = Router();
@@ -38,6 +39,10 @@ authRouter.post("/register", (req, res) => {
     return;
   }
   const normEmail = email.toLowerCase();
+  if (!isEmailAllowed(normEmail)) {
+    res.status(403).json({ error: "This app is invite-only. Ask the admin to add your email to the allowlist." });
+    return;
+  }
   if (findByEmail.get(normEmail)) {
     res.status(409).json({ error: "That email is already registered." });
     return;
