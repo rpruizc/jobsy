@@ -24,12 +24,12 @@ primary_region = "sea"
   # Keep one machine so the volume (and your data) is always reachable.
   min_machines_running = 1
 
-  [http_service.checks]
-    [http_service.checks.health]
-      path = "/healthz"
-      interval = "15s"
-      timeout = "2s"
-      grace_period = "5s"
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "15s"
+    method = "get"
+    timeout = "2s"
+    path = "/healthz"
 
 # Small, cheap machine — plenty for a personal app.
 [[vm]]
