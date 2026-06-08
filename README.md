@@ -68,20 +68,22 @@ the browser ever sees; emails stay server-side.
 fly secrets set LOGIN_RECIPIENTS="R:a@x.com,D:b@x.com,H:c@x.com,P:d@x.com,G:e@x.com" -a jobsy
 ```
 
-**2. SMTP** — how codes get sent. With Gmail, create an
-[App Password](https://myaccount.google.com/apppasswords) (needs 2-Step
-Verification on) and:
+**2. Email delivery** — codes are sent through [Resend](https://resend.com).
+Create an API key, verify a sending domain, then:
 
 ```bash
 fly secrets set -a jobsy \
-  SMTP_HOST=smtp.gmail.com SMTP_PORT=465 \
-  SMTP_USER=you@gmail.com SMTP_PASS=your-app-password \
-  MAIL_FROM="Jobsy <you@gmail.com>"
+  RESEND_API_KEY=re_your_key \
+  MAIL_FROM='Jobsy <login@yourdomain.com>'
 ```
 
+`MAIL_FROM` must be on a domain you've verified in Resend. For a quick test
+without a domain, omit `MAIL_FROM` (defaults to `onboarding@resend.dev`) — but
+Resend will only deliver to the email that owns the Resend account.
+
 It **fails closed**: with no `LOGIN_RECIPIENTS`, the picker is empty and nobody
-can sign in. Until SMTP is set, codes are logged to the server (`fly logs`)
-instead of emailed — handy for local dev, where:
+can sign in. Until `RESEND_API_KEY` is set, codes are logged to the server
+(`fly logs`) instead of emailed — handy for local dev, where:
 
 ```bash
 LOGIN_RECIPIENTS="R:me@x.com" npm run dev   # code prints to the console
