@@ -1,0 +1,21 @@
+{
+  "name": "jobsy",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A personal job radar for Seattle-area video game studios.",
+  "scripts": {
+    "radar": "tsx src/cli.ts",
+    "discover": "tsx src/discover.ts",
+    "dashboard": "tsx src/server.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.20",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Jobsy — Seattle Game Jobs</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header>
+      <div class="wrap">
+        <h1>🎮 Jobsy</h1>
+        <p class="sub">Seattle-area video game jobs, watched for you.</p>
+        <p class="meta" id="meta">Loading…</p>
+      </div>
+    </header>
+
+    <main class="wrap">
+      <section class="controls">
+        <input id="search" type="search" placeholder="Filter by title or studio…" autocomplete="off" />
+        <div class="filters" id="bucketFilters">
+          <button data-bucket="local" class="active">Seattle + Remote</button>
+          <button data-bucket="seattle">Seattle only</button>
+          <button data-bucket="remote">Remote only</button>
+          <button data-bucket="all">Everything</button>
+        </div>
+        <label class="newonly"><input type="checkbox" id="newOnly" /> New only</label>
+      </section>
+
+      <section id="jobs" class="jobs"></section>
+
+      <section id="coverage" class="coverage"></section>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

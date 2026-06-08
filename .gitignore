@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.gstack/
+.context/
+
+# Local data the radar writes (seen jobs + latest snapshot). Keep it out of git.
+data/*.json
+!data/.gitkeep
