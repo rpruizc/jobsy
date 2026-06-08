@@ -1,21 +1,28 @@
 {
   "name": "jobsy",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "A personal job radar for Seattle-area video game studios.",
+  "description": "A personal, fresh-first job search with accounts and saved searches.",
   "scripts": {
-    "radar": "tsx src/cli.ts",
-    "discover": "tsx src/discover.ts",
-    "dashboard": "tsx src/server.ts",
+    "start": "tsx src/server/index.ts",
+    "dev": "tsx watch src/server/index.ts",
     "typecheck": "tsc --noEmit"
   },
   "engines": {
     "node": ">=20"
   },
+  "dependencies": {
+    "better-sqlite3": "^11.7.0",
+    "cookie-parser": "^1.4.7",
+    "express": "^4.21.2",
+    "tsx": "^4.19.2"
+  },
   "devDependencies": {
-    "@types/node": "^22.19.20",
-    "tsx": "^4.19.2",
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/cookie-parser": "^1.4.8",
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.10.2",
     "typescript": "^5.7.2"
   }
 }

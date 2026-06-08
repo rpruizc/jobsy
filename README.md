@@ -1,113 +1,116 @@
-# 🎮 Jobsy
+# 🛰️ Jobsy
 
-A personal job radar for **Seattle-area video game studios**. It watches each
-studio's hiring page, pulls every opening, flags what's **new since you last
-checked**, and shows it all in one clean dashboard — so you find the job before
-it's buried under 300 applicants.
+A personal, **fresh-first job search** web app. Accounts, filterable search over
+1.6M+ live postings, and **saved searches that tell you what's new since you last
+looked**. The pitch: not where you browse jobs — where you catch them first.
 
-Built around the idea that the biggest edge a new grad has is *being early*.
+Built on the [bluedoor job postings API](https://bluedoor.sh/apis/job-postings/docs),
+which pulls straight from company ATSes (Greenhouse, Lever, Ashby…), so postings
+are real and carry an honest "first seen" timestamp — no ghost jobs, no
+recruiter reposts dated as new.
+
+![Jobsy](https://img.shields.io/badge/stack-Express%20%2B%20SQLite%20%2B%20vanilla%20JS-blue)
 
 ---
 
-## Quick start
+## What it does
+
+- **Accounts** — email + password, secure HTTP-only cookie sessions (scrypt
+  hashing, no third-party auth service to configure).
+- **Filtered search** — keyword, location, remote/hybrid/on-site, salary floor,
+  employment type, and a freshness window (last 24h / 48h / 7d / 30d). Results
+  are sorted newest-first with accurate "3h ago" badges.
+- **Saved searches that watch** — save a filter; the next time you open it,
+  Jobsy shows the jobs that appeared *since your last visit* at the top, using
+  the API's `first_seen_after`. The sidebar shows a live "N new" badge per
+  search.
+- **Named employers only** (on by default) — some ATSes (ADP, Oracle) hide the
+  employer. This mode queries only the name-bearing providers and caps results
+  per company so a single staffing agency can't flood the list.
+
+### Honest limitations
+- bluedoor records carry no clean company name; Jobsy derives the employer from
+  the ATS URL (`greenhouse.io/figma` → Figma). When it can't, it says "Employer
+  not disclosed" rather than guessing.
+- A few high-volume staffing agencies still appear. The per-company cap limits
+  their dominance but can't remove them.
+
+---
+
+## Run it locally
 
 ```bash
 npm install
-npm run radar       # fetch all studios, detect new jobs, print a digest
-npm run dashboard   # browse them at http://localhost:4173
+npm run dev        # http://localhost:8080, restarts on change
+# or: npm start
 ```
 
-Run `npm run radar` whenever you want a fresh pull (e.g. each morning). New
-postings get a **NEW** badge until you've seen them.
+Open the app, create an account, search, and hit **★ Save**. Data lands in a
+local SQLite file at `data/jobsy.db` (gitignored).
 
 ```bash
-npm run discover    # mine bluedoor for game studios you haven't added yet
-npm run typecheck   # tsc --noEmit
+npm run typecheck  # tsc --noEmit
 ```
 
-No API keys required. Everything uses public endpoints.
+No API key required — bluedoor's search endpoints are public.
 
 ---
 
-## How it works
+## Deploy to Fly.io
 
-Job datasets are bad at two things this tool works around:
+The app is a single container that serves the API and the frontend. SQLite lives
+on a Fly volume so accounts and saved searches survive deploys.
 
-1. **Company names are unreliable.** Searching "Valve" returns plumbing
-   companies. So every studio is pinned to its **ATS** (hiring platform) instead
-   — the exact, stable identifier.
-2. **Location tagging is inconsistent.** Big studios post roles as "Remote" with
-   no state. So Jobsy pulls each studio's *full* feed and decides the
-   Seattle/Remote bucket itself (see [`src/seattle.ts`](src/seattle.ts)).
+```bash
+fly launch --no-deploy            # creates the app; keep the Dockerfile + fly.toml
+fly volumes create jobsy_data --region sea --size 1
+fly deploy
+```
 
-### Two data layers
+`fly launch` may rename the app — update `app =` in `fly.toml` to match. The
+volume name must stay `jobsy_data` (see `[mounts]` in `fly.toml`). The container
+listens on `8080`, runs in production mode (secure cookies over HTTPS), and
+health-checks at `/healthz`.
 
-- **Direct ATS feeds** — the source of truth for studios on a known platform.
-  Public, keyless JSON APIs:
-  - Greenhouse: `boards-api.greenhouse.io/v1/boards/{slug}/jobs`
-  - Lever: `api.lever.co/v0/postings/{slug}?mode=json`
-  - BambooHR: `{slug}.bamboohr.com/careers/list`
-- **bluedoor** ([API docs](https://bluedoor.sh/apis/job-postings/docs)) — a
-  60k-company aggregator used for *discovery* (`npm run discover`) and for
-  studios it covers that aren't on a platform we fetch directly.
-
-### Honesty about coverage
-
-bluedoor's game-studio coverage is partial, and not every studio exposes a
-machine-readable feed. Jobsy never hides that: studios it can't fetch
-automatically are listed as **"check by hand"** in the coverage panel and the
-CLI digest, with a link to their careers page. You always know what's covered
-and what isn't.
+The Docker image was verified locally: it builds, compiles `better-sqlite3`,
+serves auth + search, and persists the DB to the mounted volume.
 
 ---
 
-## Maintaining the watchlist
-
-The watchlist in [`src/studios.ts`](src/studios.ts) is the heart of the tool —
-this is the part you curate. To add a studio, find its careers page; the URL
-tells you the ATS:
-
-| Careers URL contains        | Add this                                  |
-| --------------------------- | ----------------------------------------- |
-| `boards.greenhouse.io/ACME` | `{ kind: "greenhouse", account: "ACME" }` |
-| `jobs.lever.co/ACME`        | `{ kind: "lever", account: "ACME" }`      |
-| `ACME.bamboohr.com`         | `{ kind: "bamboohr", account: "ACME" }`   |
-| (can't find a feed)         | `{ kind: "manual", careersUrl: "..." }`   |
-
-Then re-run `npm run radar`. Use `npm run discover` to get suggestions for
-studios already visible in bluedoor (it found Cat Daddy Games and Seismic
-Squirrel that way).
-
-Studios seeded with verified live feeds: Nintendo of America, Studio Wildcard
-(ARK), Cat Daddy Games, Seismic Squirrel, Bungie, Undead Labs. A dozen more
-(Valve, ArenaNet, Xbox Game Studios, Halo Studios, Wizards of the Coast,
-Polyarc, Amazon Games, and others) are seeded as "manual" — find their ATS slug
-and promote them.
-
----
-
-## Project layout
+## How it's built
 
 ```
 src/
-  studios.ts        the watchlist you curate
-  seattle.ts        location bucketing (Seattle / Remote / Elsewhere)
-  types.ts          shared shapes
-  store.ts          tracks first-seen job ids -> "new" detection
-  radar.ts          orchestrates fetch + reconcile + snapshot
-  cli.ts            `npm run radar` — fetch + terminal digest
-  discover.ts       `npm run discover` — find new studios via bluedoor
-  server.ts         `npm run dashboard` — local web UI
-  fetchers/         one module per ATS (greenhouse, lever, bamboohr, bluedoor)
-public/             the dashboard (vanilla, no build step)
-data/               local state: seen.json + jobs.json (gitignored)
+  types.ts                 shared shapes (Job, SearchParams, SavedSearch…)
+  server/
+    index.ts               Express app: API routes + static frontend
+    db.ts                  better-sqlite3 schema (users, sessions, saved_searches)
+    auth.ts                scrypt hashing, cookie sessions, requireUser middleware
+    bluedoor.ts            search client: filter mapping, employer derivation,
+                           "named only" provider merge, freshness counting
+    searchParams.ts        validates/sanitizes untrusted filter input
+    routes/
+      auth.ts              register / login / logout / me
+      search.ts            GET /api/search  (auth-gated proxy)
+      saved.ts             saved-search CRUD + "new since last viewed"
+public/                    vanilla SPA (no build step): auth gate, filters,
+                           results, saved-search sidebar
+Dockerfile, fly.toml       container + Fly config
 ```
 
-## Ideas for v2
+**Data model.** `users` (email + scrypt hash), `sessions` (sha256 of the cookie
+token, 30-day expiry), `saved_searches` (per-user filter JSON + `last_viewed_at`,
+the timestamp that powers the "new since" diff). Timestamps are stored as ISO-8601
+UTC so they compare directly against the API's `first_seen_at`.
 
-- **Alerts:** with a free bluedoor key (email OTP), subscribe to webhooks so new
-  matching jobs push to you instead of you polling.
-- **Entry-level filter:** rank roles by title keywords (junior / associate /
-  new grad / I) — useful for a first job out of school.
-- **Applied tracker:** mark jobs as applied and hide them.
-- **Schedule it:** a cron/launchd job that runs `npm run radar` each morning.
+**Why the search is gated behind auth:** this is a personal/account product, not
+a public crawl surface.
+
+## Ideas for next
+
+- **Push alerts** — bluedoor offers webhooks (free API key via email OTP); fire a
+  notification when a saved search gets new matches instead of waiting for a
+  visit.
+- **Applied tracker** — mark jobs applied and hide them.
+- **OAuth sign-in** and shareable saved searches.
+- **Pagination / infinite scroll** on the results list.

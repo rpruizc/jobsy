@@ -1,0 +1,10 @@
+node_modules
+data
+.git
+.gitignore
+.gstack
+.context
+*.md
+/tmp
+npm-debug.log
+.DS_Store

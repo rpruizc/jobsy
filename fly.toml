@@ -1,0 +1,37 @@
+# Fly.io config. Rename `app` to something unique, or let `fly launch` set it.
+app = "jobsy"
+primary_region = "sea"
+
+[build]
+
+[env]
+  PORT = "8080"
+  NODE_ENV = "production"
+  DB_PATH = "/data/jobsy.db"
+
+# SQLite lives on a persistent volume so accounts and saved searches survive
+# deploys and restarts. Create it once with:
+#   fly volumes create jobsy_data --region sea --size 1
+[mounts]
+  source = "jobsy_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  # Keep one machine so the volume (and your data) is always reachable.
+  min_machines_running = 1
+
+  [http_service.checks]
+    [http_service.checks.health]
+      path = "/healthz"
+      interval = "15s"
+      timeout = "2s"
+      grace_period = "5s"
+
+# Small, cheap machine — plenty for a personal app.
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

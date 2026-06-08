@@ -3,35 +3,92 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Jobsy — Seattle Game Jobs</title>
+    <title>Jobsy — fresh-first job search</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <header>
-      <div class="wrap">
-        <h1>🎮 Jobsy</h1>
-        <p class="sub">Seattle-area video game jobs, watched for you.</p>
-        <p class="meta" id="meta">Loading…</p>
-      </div>
-    </header>
-
-    <main class="wrap">
-      <section class="controls">
-        <input id="search" type="search" placeholder="Filter by title or studio…" autocomplete="off" />
-        <div class="filters" id="bucketFilters">
-          <button data-bucket="local" class="active">Seattle + Remote</button>
-          <button data-bucket="seattle">Seattle only</button>
-          <button data-bucket="remote">Remote only</button>
-          <button data-bucket="all">Everything</button>
+    <!-- Auth gate -->
+    <div id="auth" class="auth hidden">
+      <div class="auth-card">
+        <h1>🛰️ Jobsy</h1>
+        <p class="tagline">Job search that gets you there first.</p>
+        <div class="auth-tabs">
+          <button id="tabLogin" class="active">Sign in</button>
+          <button id="tabRegister">Create account</button>
         </div>
-        <label class="newonly"><input type="checkbox" id="newOnly" /> New only</label>
-      </section>
+        <form id="authForm">
+          <input id="email" type="email" placeholder="you@email.com" autocomplete="email" required />
+          <input id="password" type="password" placeholder="Password (8+ characters)" autocomplete="current-password" required />
+          <button type="submit" id="authSubmit">Sign in</button>
+          <p id="authError" class="error"></p>
+        </form>
+      </div>
+    </div>
 
-      <section id="jobs" class="jobs"></section>
+    <!-- App -->
+    <div id="app" class="app hidden">
+      <header>
+        <div class="wrap header-inner">
+          <div class="brand">🛰️ <strong>Jobsy</strong> <span class="tagline-sm">fresh-first job search</span></div>
+          <div class="account">
+            <span id="who" class="muted"></span>
+            <button id="logout" class="ghost">Sign out</button>
+          </div>
+        </div>
+      </header>
 
-      <section id="coverage" class="coverage"></section>
-    </main>
+      <div class="wrap layout">
+        <!-- Saved searches -->
+        <aside class="sidebar">
+          <h2>Saved searches</h2>
+          <ul id="savedList" class="saved-list"></ul>
+          <p id="savedEmpty" class="muted small">Run a search and hit <em>Save</em> to watch it for new jobs.</p>
+        </aside>
 
+        <!-- Search + results -->
+        <main class="main">
+          <form id="searchForm" class="filters">
+            <input id="q" name="q" type="search" placeholder="Role or keyword (e.g. software engineer)" />
+            <input id="location" name="location" type="text" placeholder="Location (e.g. Austin, or leave blank)" />
+            <select id="workplaceType" name="workplaceType">
+              <option value="">Any location type</option>
+              <option value="remote">Remote</option>
+              <option value="hybrid">Hybrid</option>
+              <option value="on_site">On-site</option>
+            </select>
+            <select id="employmentType" name="employmentType">
+              <option value="">Any type</option>
+              <option value="full_time">Full-time</option>
+              <option value="part_time">Part-time</option>
+              <option value="contract">Contract</option>
+              <option value="internship">Internship</option>
+            </select>
+            <select id="salaryMin" name="salaryMin">
+              <option value="">Any salary</option>
+              <option value="60000">$60k+</option>
+              <option value="90000">$90k+</option>
+              <option value="120000">$120k+</option>
+              <option value="160000">$160k+</option>
+            </select>
+            <select id="postedWithinHours" name="postedWithinHours">
+              <option value="">Any time</option>
+              <option value="24">Last 24 hours</option>
+              <option value="48">Last 48 hours</option>
+              <option value="168">Last 7 days</option>
+              <option value="720">Last 30 days</option>
+            </select>
+            <button type="submit" class="primary">Search</button>
+            <button type="button" id="saveBtn" class="ghost">★ Save</button>
+          </form>
+          <label class="named-toggle"><input type="checkbox" id="namedOnly" checked /> Named employers only <span class="muted small">(hides postings that don't disclose the company)</span></label>
+
+          <div id="resultsMeta" class="results-meta muted"></div>
+          <div id="results" class="results"></div>
+        </main>
+      </div>
+    </div>
+
+    <script src="/api.js"></script>
     <script src="/app.js"></script>
   </body>
 </html>

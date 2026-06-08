@@ -1,109 +1,240 @@
-const state = { jobs: [], studios: [], bucket: "local", newOnly: false, q: "" };
+const $ = (id) => document.getElementById(id);
+let mode = "login"; // or "register"
 
-const el = {
-  meta: document.getElementById("meta"),
-  jobs: document.getElementById("jobs"),
-  coverage: document.getElementById("coverage"),
-  search: document.getElementById("search"),
-  newOnly: document.getElementById("newOnly"),
-  bucketFilters: document.getElementById("bucketFilters"),
-};
-
-function matchesBucket(j) {
-  switch (state.bucket) {
-    case "seattle": return j.isSeattle;
-    case "remote": return j.isRemote && !j.isSeattle;
-    case "all": return true;
-    case "local":
-    default: return j.isSeattle || j.isRemote;
-  }
+// ---------- helpers ----------
+function relTime(iso) {
+  if (!iso) return "";
+  const mins = Math.max(0, (Date.now() - new Date(iso).getTime()) / 60000);
+  if (mins < 60) return `${Math.round(mins)}m ago`;
+  const hrs = mins / 60;
+  if (hrs < 24) return `${Math.round(hrs)}h ago`;
+  const days = hrs / 24;
+  if (days < 30) return `${Math.round(days)}d ago`;
+  return `${Math.round(days / 30)}mo ago`;
+}
+function isFresh(iso) {
+  return iso && Date.now() - new Date(iso).getTime() < 24 * 3600 * 1000;
+}
+function salaryText(j) {
+  if (!j.salaryMin && !j.salaryMax) return null;
+  const f = (n) => (n >= 1000 ? `$${Math.round(n / 1000)}k` : `$${n}`);
+  const cur = j.salaryCurrency && j.salaryCurrency !== "USD" ? ` ${j.salaryCurrency}` : "";
+  const range = j.salaryMin && j.salaryMax ? `${f(j.salaryMin)}–${f(j.salaryMax)}` : f(j.salaryMin || j.salaryMax);
+  return `${range}${cur}${j.salaryPeriod ? `/${j.salaryPeriod}` : ""}`;
 }
 
-function visibleJobs() {
-  const q = state.q.trim().toLowerCase();
-  return state.jobs
-    .filter(matchesBucket)
-    .filter((j) => !state.newOnly || j.isNew)
-    .filter((j) => !q || j.title.toLowerCase().includes(q) || j.studio.toLowerCase().includes(q))
-    .sort((a, b) => Number(b.isNew) - Number(a.isNew) || a.studio.localeCompare(b.studio) || a.title.localeCompare(b.title));
-}
-
-function jobRow(j) {
+function jobEl(j) {
   const a = document.createElement("a");
-  a.className = "job";
+  a.className = "job" + (isFresh(j.firstSeenAt) ? " fresh" : "");
   a.href = j.url || "#";
   a.target = "_blank";
   a.rel = "noopener";
 
-  const locClass = j.isSeattle ? "seattle" : j.isRemote ? "remote" : "";
-  a.innerHTML = `
-    ${j.isNew ? '<span class="new">NEW</span>' : ""}
-    <span class="title"></span>
-    <span class="studio"></span>
-    <span class="loc ${locClass}"></span>`;
-  a.querySelector(".title").textContent = j.title;
-  a.querySelector(".studio").textContent = j.studio;
-  a.querySelector(".loc").textContent = j.locationText || (j.isRemote ? "Remote" : "—");
+  const title = document.createElement("div");
+  title.className = "title";
+  title.textContent = j.title;
+
+  const age = document.createElement("div");
+  age.className = "age" + (isFresh(j.firstSeenAt) ? " fresh" : "");
+  age.textContent = relTime(j.firstSeenAt);
+
+  const company = document.createElement("div");
+  company.className = "company";
+  company.textContent = j.company || "Employer not disclosed";
+
+  const meta = document.createElement("div");
+  meta.className = "meta-row";
+  const chips = [];
+  if (j.location) chips.push(["chip", j.location]);
+  if (j.workplaceType) chips.push(["chip remote", j.workplaceType.replace("_", "-")]);
+  const sal = salaryText(j);
+  if (sal) chips.push(["chip salary", sal]);
+  if (j.employmentType) chips.push(["chip", j.employmentType.replace("_", " ")]);
+  for (const [cls, text] of chips) {
+    const c = document.createElement("span");
+    c.className = cls;
+    c.textContent = text;
+    meta.appendChild(c);
+  }
+
+  a.append(title, age, company, meta);
   return a;
 }
 
-function render() {
-  const jobs = visibleJobs();
-  el.jobs.replaceChildren();
-  if (jobs.length === 0) {
-    const d = document.createElement("div");
-    d.className = "empty";
-    d.textContent = "No matching jobs. Try a wider filter, or run `npm run radar` to refresh.";
-    el.jobs.append(d);
-  } else {
-    jobs.forEach((j) => el.jobs.append(jobRow(j)));
+function renderResults(jobs, total, { newJobs } = {}) {
+  const results = $("results");
+  results.replaceChildren();
+
+  if (newJobs && newJobs.length) {
+    const label = document.createElement("div");
+    label.className = "section-label";
+    label.textContent = `★ ${newJobs.length} new since you last looked`;
+    results.appendChild(label);
+    newJobs.forEach((j) => results.appendChild(jobEl(j)));
+    const rest = document.createElement("div");
+    rest.className = "section-label";
+    rest.style.color = "var(--muted)";
+    rest.textContent = "Everything else";
+    results.appendChild(rest);
   }
 
-  const newCount = state.jobs.filter((j) => j.isNew).length;
-  el.meta.textContent =
-    `${jobs.length} shown · ${newCount} new since last refresh · ` +
-    `last updated ${state.generatedAt ? new Date(state.generatedAt).toLocaleString() : "—"}`;
-}
-
-function renderCoverage() {
-  const total = state.studios.reduce((n, s) => n + s.count, 0);
-  el.coverage.innerHTML = `<h2>Coverage — ${state.studios.length} studios, ${total} jobs</h2><div class="cov-grid"></div>`;
-  const grid = el.coverage.querySelector(".cov-grid");
-  for (const s of state.studios) {
-    const div = document.createElement("div");
-    div.className = "cov" + (s.error ? " err" : s.kind === "manual" ? " manual" : "");
-    const name = document.createElement("span");
-    name.textContent = s.name;
-    const n = document.createElement("span");
-    n.className = "n";
-    n.textContent = s.error ? "error" : s.kind === "manual" ? "check by hand" : `${s.count}`;
-    div.append(name, n);
-    grid.append(div);
-  }
-}
-
-async function load() {
-  const res = await fetch("/api/jobs");
-  if (!res.ok) {
-    el.meta.textContent = "No data yet — run `npm run radar`, then refresh.";
+  if (!jobs.length) {
+    const e = document.createElement("div");
+    e.className = "empty";
+    e.textContent = "No jobs match. Try widening the filters or the time window.";
+    results.appendChild(e);
     return;
   }
-  const snap = await res.json();
-  state.jobs = snap.jobs ?? [];
-  state.studios = snap.studios ?? [];
-  state.generatedAt = snap.generatedAt;
-  render();
-  renderCoverage();
+  jobs.forEach((j) => results.appendChild(jobEl(j)));
 }
 
-el.search.addEventListener("input", () => { state.q = el.search.value; render(); });
-el.newOnly.addEventListener("change", () => { state.newOnly = el.newOnly.checked; render(); });
-el.bucketFilters.addEventListener("click", (e) => {
-  const btn = e.target.closest("button");
-  if (!btn) return;
-  state.bucket = btn.dataset.bucket;
-  [...el.bucketFilters.children].forEach((b) => b.classList.toggle("active", b === btn));
-  render();
+function currentParams() {
+  return {
+    q: $("q").value.trim(),
+    location: $("location").value.trim(),
+    workplaceType: $("workplaceType").value,
+    employmentType: $("employmentType").value,
+    salaryMin: $("salaryMin").value,
+    postedWithinHours: $("postedWithinHours").value,
+    namedOnly: $("namedOnly").checked ? "true" : "",
+  };
+}
+function applyParams(p = {}) {
+  $("q").value = p.q || "";
+  $("location").value = p.location || "";
+  $("workplaceType").value = p.workplaceType || "";
+  $("employmentType").value = p.employmentType || "";
+  $("salaryMin").value = p.salaryMin || "";
+  $("postedWithinHours").value = p.postedWithinHours || "";
+  $("namedOnly").checked = !!p.namedOnly;
+}
+
+// ---------- actions ----------
+async function runSearch() {
+  $("resultsMeta").textContent = "Searching…";
+  try {
+    const { jobs, total } = await api.search(currentParams());
+    $("resultsMeta").textContent =
+      `${total != null ? total.toLocaleString() : jobs.length}+ matches · showing ${jobs.length} · newest first`;
+    renderResults(jobs, total);
+  } catch (err) {
+    $("resultsMeta").textContent = err.message;
+  }
+}
+
+async function loadSaved() {
+  const { saved } = await api.savedList();
+  const list = $("savedList");
+  list.replaceChildren();
+  $("savedEmpty").classList.toggle("hidden", saved.length > 0);
+  for (const s of saved) {
+    const li = document.createElement("li");
+    li.className = "saved-item";
+    const left = document.createElement("div");
+    const name = document.createElement("div");
+    name.className = "name";
+    name.textContent = s.name;
+    const sub = document.createElement("div");
+    sub.className = "sub";
+    sub.textContent = describe(s.params);
+    left.append(name, sub);
+
+    const badge = document.createElement("span");
+    badge.className = "badge" + (s.newCount ? "" : " zero");
+    badge.textContent = s.newCount || 0;
+
+    const del = document.createElement("button");
+    del.className = "del";
+    del.textContent = "×";
+    del.title = "Delete";
+    del.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      await api.savedDelete(s.id);
+      loadSaved();
+    });
+
+    li.append(left, badge, del);
+    li.addEventListener("click", () => openSaved(s.id));
+    list.appendChild(li);
+  }
+}
+
+function describe(p) {
+  const bits = [p.q, p.location, p.workplaceType, p.salaryMin ? `$${Math.round(p.salaryMin / 1000)}k+` : null]
+    .filter(Boolean);
+  return bits.length ? bits.join(" · ") : "all jobs";
+}
+
+async function openSaved(id) {
+  $("resultsMeta").textContent = "Loading saved search…";
+  const data = await api.savedView(id);
+  applyParams(data.params);
+  $("resultsMeta").textContent =
+    `${data.name} · ${data.newJobs.length} new · ${data.jobs.length} shown`;
+  renderResults(data.jobs, data.total, { newJobs: data.newJobs });
+  loadSaved(); // badge resets to 0 after viewing
+}
+
+async function saveCurrent() {
+  const name = prompt("Name this saved search:", $("q").value || "My search");
+  if (!name) return;
+  await api.savedCreate(name, currentParams());
+  loadSaved();
+}
+
+// ---------- auth ----------
+function showApp(user) {
+  $("auth").classList.add("hidden");
+  $("app").classList.remove("hidden");
+  $("who").textContent = user.email;
+  loadSaved();
+  runSearch();
+}
+function showAuth() {
+  $("app").classList.add("hidden");
+  $("auth").classList.remove("hidden");
+}
+function setMode(m) {
+  mode = m;
+  $("tabLogin").classList.toggle("active", m === "login");
+  $("tabRegister").classList.toggle("active", m === "register");
+  $("authSubmit").textContent = m === "login" ? "Sign in" : "Create account";
+  $("password").autocomplete = m === "login" ? "current-password" : "new-password";
+  $("authError").textContent = "";
+}
+
+$("tabLogin").addEventListener("click", () => setMode("login"));
+$("tabRegister").addEventListener("click", () => setMode("register"));
+$("authForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const email = $("email").value.trim();
+  const password = $("password").value;
+  try {
+    const { user } = mode === "login" ? await api.login(email, password) : await api.register(email, password);
+    showApp(user);
+  } catch (err) {
+    $("authError").textContent = err.message;
+  }
+});
+$("logout").addEventListener("click", async () => {
+  await api.logout();
+  showAuth();
 });
 
-load();
+$("searchForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  runSearch();
+});
+$("saveBtn").addEventListener("click", saveCurrent);
+$("namedOnly").addEventListener("change", runSearch);
+
+// ---------- boot ----------
+(async () => {
+  try {
+    const { user } = await api.me();
+    if (user) showApp(user);
+    else showAuth();
+  } catch {
+    showAuth();
+  }
+})();
