@@ -16,7 +16,8 @@ recruiter reposts dated as new.
 ## What it does
 
 - **Accounts** — email + password, secure HTTP-only cookie sessions (scrypt
-  hashing, no third-party auth service to configure).
+  hashing, no third-party auth service to configure). Registration is
+  **invite-only** via an email allowlist (see below).
 - **Filtered search** — keyword, location, remote/hybrid/on-site, salary floor,
   employment type, and a freshness window (last 24h / 48h / 7d / 30d). Results
   are sorted newest-first with accurate "3h ago" badges.
@@ -53,6 +54,22 @@ npm run typecheck  # tsc --noEmit
 ```
 
 No API key required — bluedoor's search endpoints are public.
+
+### Registration allowlist (invite-only)
+
+Only emails in the `ALLOWED_EMAILS` env var (comma-separated, case-insensitive)
+may create an account. It **fails closed**: if unset, nobody can register. Login
+for existing accounts is unaffected.
+
+```bash
+# Local dev: allow yourself
+ALLOWED_EMAILS="me@example.com" npm run dev
+
+# Fly: set it as a secret (keeps emails out of the repo), then redeploy
+fly secrets set ALLOWED_EMAILS="you@example.com,son@example.com"
+```
+
+Set this **before** the first person registers, or they'll get a 403.
 
 ---
 

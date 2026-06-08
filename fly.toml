@@ -8,6 +8,9 @@ primary_region = "sea"
   PORT = "8080"
   NODE_ENV = "production"
   DB_PATH = "/data/jobsy.db"
+  # Registration is invite-only. Set the allowlist as a SECRET (keeps emails out
+  # of the repo), then redeploy:
+  #   fly secrets set ALLOWED_EMAILS="you@example.com,son@example.com"
 
 # SQLite lives on a persistent volume so accounts and saved searches survive
 # deploys and restarts. Create it once with:
