@@ -35,7 +35,9 @@ authRouter.post("/request-code", async (req, res) => {
   const code = issueCode(key);
   try {
     await sendLoginCode(email, code, key);
-  } catch {
+  } catch (err) {
+    // Log the underlying reason (e.g. Resend rejection) without leaking it.
+    console.error(`sendLoginCode failed for "${key}":`, err instanceof Error ? err.message : err);
     res.status(502).json({ error: "Couldn't send the code right now. Try again." });
     return;
   }
